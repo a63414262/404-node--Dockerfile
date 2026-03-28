@@ -1,4 +1,4 @@
-# 1. 换用标准 Debian 镜像，完美兼容 Xray 和 Argo 核心
+# 1. 换用标准 Debian 镜像，完美兼容 
 FROM node:18
 
 # 2. 安装必要工具 (Debian 系统使用 apt-get)
