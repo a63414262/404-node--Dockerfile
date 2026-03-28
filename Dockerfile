@@ -19,7 +19,7 @@ RUN npm install
 ENV PORT=7860
 
 # 关键修改 2：使用变量进行 EXPOSE（注：EXPOSE 更多是作为文档和提示，云平台实际上是直接读取 PORT 变量）
-EXPOSE $PORT
+EXPOSE 7860
 
 # 运行 index.js
 CMD ["node", "index.js"]
