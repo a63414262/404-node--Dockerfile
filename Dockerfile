@@ -1,39 +1,26 @@
-FROM node:18-bullseye-slim
+# 使用轻量级的 Node.js 18 镜像
+FROM node:18-alpine
 
-# 1. 安装基础环境
-RUN apt-get update && apt-get install -y git curl unzip
+# 安装必要工具
+RUN apk add --no-cache git curl unzip
 
-# 2. 拉取你的源码
+# 克隆仓库
 RUN git clone https://github.com/a63414262/404-node.git /app
+
+# 设置工作目录
 WORKDIR /app
 
-# 3. 安装依赖
+# 安装依赖
 RUN npm install
 
-# 4. 【终极外挂】：创建一个完全独立的补丁文件，接管底层 API
-RUN echo "const net = require('net');" > patch.js && \
-    echo "const http = require('http');" >> patch.js && \
-    echo "function patchListen(originalListen) {" >> patch.js && \
-    echo "  return function(...args) {" >> patch.js && \
-    echo "    if (typeof args[0] === 'number' || typeof args[0] === 'string') {" >> patch.js && \
-    echo "      const cb = args.find(a => typeof a === 'function');" >> patch.js && \
-    echo "      return originalListen.call(this, args[0], '0.0.0.0', cb);" >> patch.js && \
-    echo "    }" >> patch.js && \
-    echo "    return originalListen.apply(this, args);" >> patch.js && \
-    echo "  };" >> patch.js && \
-    echo "}" >> patch.js && \
-    echo "net.Server.prototype.listen = patchListen(net.Server.prototype.listen);" >> patch.js && \
-    echo "http.Server.prototype.listen = patchListen(http.Server.prototype.listen);" >> patch.js && \
-    echo "const oldWriteHead = http.ServerResponse.prototype.writeHead;" >> patch.js && \
-    echo "http.ServerResponse.prototype.writeHead = function(statusCode, ...args) {" >> patch.js && \
-    echo "  if (statusCode === 404) statusCode = 200;" >> patch.js && \
-    echo "  return oldWriteHead.call(this, statusCode, ...args);" >> patch.js && \
-    echo "};" >> patch.js && \
-    echo "process.on('uncaughtException', err => console.log('[Anti-Crash]', err.message));" >> patch.js
-
-# 5. 配置云端要求的端口
+# Fly.io 专用设置：
+# 虽然你之前提到了 3000，但在你的日志里：
+# Web UI 监听 3001，多路复用器监听 7860。
+# 我们这里统一使用 7860 作为主入口（或者根据你 fly.toml 的设置改为 3000）
 ENV PORT=7860
+
+# 明确写出数字，方便 Fly.io 扫描
 EXPOSE 7860
 
-# 6. 【关键】：使用 node -r 预加载我们的 patch.js 外挂，再运行你的代码
-CMD ["node", "-r", "./patch.js", "index.js"]
+# 运行
+CMD ["node", "index.js"]
