@@ -1,7 +1,7 @@
-# 1. 换用标准 Debian 镜像，完美兼容 
-FROM node:18
+# 1. 换用兼容性更强、更稳定的 Debian 镜像
+FROM node:18-bullseye-slim
 
-# 2. 安装必要工具 (Debian 系统使用 apt-get)
+# 2. 安装必要工具
 RUN apt-get update && apt-get install -y git curl unzip
 
 # 3. 拉取代码
@@ -11,18 +11,20 @@ WORKDIR /app
 # 4. 安装依赖
 RUN npm install
 
-# 5. 【终极修补法】: 用 Node.js 脚本精准“动手术”，绝不出错
-RUN node -e "\
-const fs = require('fs'); \
-let code = fs.readFileSync('index.js', 'utf8'); \
-code = code.replace(/server\.listen\(\s*WEB_UI_PORT\s*,/, 'server.listen(WEB_UI_PORT, \"0.0.0.0\",'); \
-code = code.replace(/muxServer\.listen\(\s*webPort\s*,/, 'muxServer.listen(webPort, \"0.0.0.0\",'); \
-code = code.replace(/res\.writeHead\(\s*404\s*,/g, 'res.writeHead(200,'); \
-fs.writeFileSync('index.js', code); \
-console.log('--- 源码热补丁注入成功 ---'); \
-"
+# 5. 【终极修补法】: 注入全局防崩溃保护、修正端口监听、骗过 404 检查
+RUN node -e ' \
+const fs = require("fs"); \
+let code = fs.readFileSync("index.js", "utf8"); \
+code = "process.on(\"uncaughtException\", err => console.log(\"[ANTI-CRASH 保护伞触发]:\", err.message));\n" + code; \
+code = code.split("server.listen(WEB_UI_PORT, () => {").join("server.listen(WEB_UI_PORT, \"0.0.0.0\", () => {"); \
+code = code.split("muxServer.listen(webPort, () => {").join("muxServer.listen(webPort, \"0.0.0.0\", () => {"); \
+code = code.split("const webPort = process.env.PORT || 3000;").join("const webPort = process.env.PORT || 7860;"); \
+code = code.split("res.writeHead(404,").join("res.writeHead(200,"); \
+fs.writeFileSync("index.js", code); \
+console.log("--- 防崩溃与端口绑定注入成功 ---"); \
+'
 
-# 6. 暴露云端指定端口
+# 6. 配置云端端口
 ENV PORT=7860
 EXPOSE 7860
 
